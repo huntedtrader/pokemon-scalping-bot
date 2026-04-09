@@ -416,7 +416,7 @@ render_navbar()
 # Navigation via Streamlit buttons (since HTML links can't trigger Streamlit)
 if is_logged_in():
     nav_cols = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
-    pages = ["Home", "How We Operate", "Site Guides", "PAS Fees", "IMAP Setup", "FAQ", "Terms",
+    pages = ["Home", "How We Operate", "Site Guides", "PAS Fees", "FAQ", "Terms",
              "My Orders", "My Profile", "My Data", "API Keys", "Admin"]
     # Split into two rows if needed
     nav_cols = st.columns(len(pages))
@@ -434,7 +434,7 @@ if is_logged_in():
             do_logout()
             st.rerun()
 else:
-    pages = ["Home", "How We Operate", "Site Guides", "PAS Fees", "IMAP Setup", "FAQ", "Terms",
+    pages = ["Home", "How We Operate", "Site Guides", "PAS Fees", "FAQ", "Terms",
              "Login", "Register", "Admin"]
     nav_cols = st.columns(len(pages))
     for i, p in enumerate(pages):
@@ -599,7 +599,6 @@ elif page == "How We Operate":
     - **Payment method** -- credit or debit card
     - **Shipping and billing address**
     - **Name, phone number, and email**
-    - **IMAP App Password** (Gmail) -- for order verification emails
     """)
 
     st.markdown("""
@@ -758,49 +757,6 @@ elif page == "PAS Fees":
             <span class="step-num">{i+1}</span> {s}
         </div>
         """, unsafe_allow_html=True)
-
-    render_footer()
-
-
-# ========================================================================
-# IMAP SETUP
-# ========================================================================
-elif page == "IMAP Setup":
-    st.markdown("# IMAP Setup")
-    st.markdown("Create a Gmail App Password for order verification.")
-
-    st.markdown("""
-    <div class="info-box">
-        We use IMAP to read order confirmation and verification emails from retailers.
-        This requires a <strong>Gmail App Password</strong> -- a separate credential from your main password.
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    imap_steps = [
-        ("Sign into Gmail", "Open Chrome and sign into your Gmail account."),
-        ("Open Account Settings", "Click profile picture > <strong>Manage Your Google Account</strong>."),
-        ("Go to Security", "Navigate to the <strong>Security</strong> section."),
-        ("Enable 2-Step Verification", "Turn ON <strong>2-Step Verification</strong>. Required for App Passwords."),
-        ("Create App Password", "Search <strong>App Passwords</strong> in security settings."),
-        ("Name It", 'Name it <strong>"ACO"</strong> or <strong>"Pokemon Bot"</strong>.'),
-        ("Save It", "Copy the generated password and submit it when registering your profile."),
-    ]
-    for i, (title, desc) in enumerate(imap_steps):
-        st.markdown(f"""
-        <div class="step-box">
-            <span class="step-num">{i+1}</span>
-            <strong>{title}</strong><br>
-            <span class="dim" style="margin-left:42px;display:block;margin-top:4px">{desc}</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="warn-box">
-        The App Password is <strong>separate</strong> from your main Gmail password. Keep it saved somewhere safe.
-    </div>
-    """, unsafe_allow_html=True)
 
     render_footer()
 
@@ -984,15 +940,6 @@ elif page == "Register":
             retailer_password = st.text_input("Retailer Account Password", type="password")
 
         st.markdown("---")
-        st.markdown("### IMAP (Gmail App Password)")
-        st.caption("For order verification emails. See IMAP Setup page.")
-        im1, im2 = st.columns(2)
-        with im1:
-            imap_email = st.text_input("Gmail Address")
-        with im2:
-            imap_app_password = st.text_input("Gmail App Password", type="password")
-
-        st.markdown("---")
         st.markdown("### Data Preference")
         retention = st.radio("After a successful checkout:", ["keep", "delete_after_checkout"],
                              format_func=lambda x: {
@@ -1034,7 +981,6 @@ elif page == "Register":
                         "card_number": card_number, "exp_month": exp_month,
                         "exp_year": exp_year, "cvv": cvv, "cardholder": cardholder,
                         "retailer_email": retailer_email, "retailer_password": retailer_password,
-                        "imap_email": imap_email, "imap_app_password": imap_app_password,
                     }
                     cm.store_profile(customer.customer_id, retailer, profile_data)
 
@@ -1201,12 +1147,6 @@ elif page == "My Profile":
         with rl2:
             rp = st.text_input("Retailer Password", type="password")
 
-        im1, im2 = st.columns(2)
-        with im1:
-            ie = st.text_input("Gmail")
-        with im2:
-            ip = st.text_input("App Password", type="password")
-
         if st.form_submit_button("Add Profile", use_container_width=True):
             pd = {
                 "first_name": first_name, "last_name": last_name,
@@ -1215,7 +1155,6 @@ elif page == "My Profile":
                 "city": city, "state": sv.upper(), "zip": zv, "country": "US",
                 "card_number": cn, "exp_month": em, "exp_year": ey, "cvv": cv, "cardholder": ch,
                 "retailer_email": re, "retailer_password": rp,
-                "imap_email": ie, "imap_app_password": ip,
             }
             cm.store_profile(cid, retailer, pd)
             st.success(f"**{retailer.replace('_',' ').title()}** profile added.")
