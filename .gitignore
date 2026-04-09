@@ -1,0 +1,41 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Config with secrets
+config/config.yaml
+config/.key
+config/proxies.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Logs
+logs/
+
+# Selenium
+chromedriver*
+geckodriver*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Tokens
+*.json
+!package.json
+
+# Streamlit
+.streamlit/
