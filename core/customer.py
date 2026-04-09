@@ -1,10 +1,10 @@
 """Customer management for the ACO (Automated Checkout) service.
 
 Handles customer onboarding, profile storage, PAS (Pay After Success)
-fee tracking, and automatic data purging after fulfillment.
+fee tracking, and customer-controlled data management.
 
 All customer data (credentials, card info, addresses) is encrypted
-at rest and deleted after the product is secured.
+at rest. Customers choose whether to keep or delete their data.
 """
 
 import json
@@ -40,6 +40,18 @@ PAS_FEES = {
 PAYMENT_NOTIFICATION_WINDOW = 24
 PAYMENT_DEADLINE_HOURS = 72
 
+# Card charge disclaimer
+CARD_DISCLAIMER = (
+    "DISCLAIMER: By providing your payment information, you authorize us to "
+    "use your card details solely to complete purchases on your behalf through "
+    "the selected retailer(s). Your card will be charged directly by the "
+    "retailer for the product price at checkout -- we never charge your card "
+    "ourselves. The only fee we collect is the PAS (Pay After Success) service "
+    "fee, which is billed separately via Stripe after a successful checkout. "
+    "All payment data is AES-256 encrypted at rest. You may request deletion "
+    "of your stored data at any time through the dashboard or by contacting us."
+)
+
 
 @dataclass
 class Customer:
@@ -50,6 +62,7 @@ class Customer:
     email: str
     status: str = "active"       # active, suspended, banned
     tier: str = "standard"       # standard, bulk, vip
+    data_retention: str = "keep" # keep, delete_after_checkout
     created_at: float = field(default_factory=time.time)
     total_checkouts: int = 0
     total_fees_paid: float = 0.0
@@ -59,14 +72,14 @@ class Customer:
 
 @dataclass
 class CustomerProfile:
-    """A customer's checkout profile (encrypted at rest, deleted after use)."""
+    """A customer's checkout profile (encrypted at rest)."""
     profile_id: str
     customer_id: str
     retailer: str                # which retailer this profile is for
     profile_data: dict = field(default_factory=dict)  # encrypted blob
     created_at: float = field(default_factory=time.time)
     used: bool = False
-    purged: bool = False         # True after data deletion
+    purged: bool = False         # True if customer requested deletion
 
 
 @dataclass
@@ -108,6 +121,7 @@ class CustomerManager:
                 email TEXT NOT NULL,
                 status TEXT DEFAULT 'active',
                 tier TEXT DEFAULT 'standard',
+                data_retention TEXT DEFAULT 'keep',
                 created_at REAL,
                 total_checkouts INTEGER DEFAULT 0,
                 total_fees_paid REAL DEFAULT 0.0,
@@ -152,7 +166,12 @@ class CustomerManager:
     # --- Customer CRUD ---
 
     def add_customer(
-        self, discord_id: str, discord_name: str, email: str, tier: str = "standard"
+        self,
+        discord_id: str,
+        discord_name: str,
+        email: str,
+        tier: str = "standard",
+        data_retention: str = "keep",
     ) -> Customer:
         """Register a new customer."""
         import hashlib
@@ -164,13 +183,16 @@ class CustomerManager:
             discord_name=discord_name,
             email=email,
             tier=tier,
+            data_retention=data_retention,
         )
 
         self.db.execute(
             """INSERT INTO customers
-               (customer_id, discord_id, discord_name, email, status, tier, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (customer_id, discord_id, discord_name, email, "active", tier, time.time()),
+               (customer_id, discord_id, discord_name, email, status, tier,
+                data_retention, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (customer_id, discord_id, discord_name, email, "active", tier,
+             data_retention, time.time()),
         )
         self.db.commit()
         log.info(f"New customer registered: {discord_name} ({customer_id})")
@@ -183,7 +205,11 @@ class CustomerManager:
         ).fetchone()
         if not row:
             return None
-        return Customer(**dict(row))
+        row_dict = dict(row)
+        # Handle older DB rows missing data_retention column
+        if "data_retention" not in row_dict:
+            row_dict["data_retention"] = "keep"
+        return Customer(**row_dict)
 
     def get_customer_by_discord(self, discord_id: str) -> Optional[Customer]:
         """Get customer by Discord ID."""
@@ -192,7 +218,10 @@ class CustomerManager:
         ).fetchone()
         if not row:
             return None
-        return Customer(**dict(row))
+        row_dict = dict(row)
+        if "data_retention" not in row_dict:
+            row_dict["data_retention"] = "keep"
+        return Customer(**row_dict)
 
     def list_customers(self, status: str = None) -> list[Customer]:
         """List all customers, optionally filtered by status."""
@@ -204,7 +233,27 @@ class CustomerManager:
             rows = self.db.execute(
                 "SELECT * FROM customers ORDER BY created_at DESC"
             ).fetchall()
-        return [Customer(**dict(r)) for r in rows]
+        results = []
+        for r in rows:
+            row_dict = dict(r)
+            if "data_retention" not in row_dict:
+                row_dict["data_retention"] = "keep"
+            results.append(Customer(**row_dict))
+        return results
+
+    def update_data_retention(self, customer_id: str, preference: str):
+        """Update a customer's data retention preference.
+
+        Args:
+            customer_id: Customer ID
+            preference: 'keep' to retain data, 'delete_after_checkout' to auto-delete
+        """
+        self.db.execute(
+            "UPDATE customers SET data_retention = ? WHERE customer_id = ?",
+            (preference, customer_id),
+        )
+        self.db.commit()
+        log.info(f"Data retention updated for {customer_id}: {preference}")
 
     def suspend_customer(self, customer_id: str, reason: str = ""):
         """Suspend a customer (e.g., for non-payment)."""
@@ -222,8 +271,6 @@ class CustomerManager:
             (reason, customer_id),
         )
         self.db.commit()
-        # Purge all their data
-        self.purge_customer_data(customer_id)
         log.warning(f"Customer banned: {customer_id} - {reason}")
 
     # --- Profile Management ---
@@ -336,30 +383,42 @@ class CustomerManager:
 
         return profiles
 
-    def purge_customer_data(self, customer_id: str):
-        """Delete all sensitive customer data (post-checkout or on ban).
+    def get_profile_summary(self, customer_id: str) -> list[dict]:
+        """Get a non-sensitive summary of stored profiles (for display)."""
+        rows = self.db.execute(
+            """SELECT profile_id, retailer, created_at, used, purged
+               FROM customer_profiles
+               WHERE customer_id = ?
+               ORDER BY created_at DESC""",
+            (customer_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
-        Marks profiles as purged and overwrites encrypted data with zeros.
+    def delete_customer_data(self, customer_id: str):
+        """Customer-requested deletion of all their stored profile data.
+
+        Overwrites encrypted data and marks profiles as purged.
+        Order history is retained for billing records.
         """
         self.db.execute(
             """UPDATE customer_profiles
-               SET encrypted_data = 'PURGED', purged = 1
+               SET encrypted_data = 'DELETED_BY_CUSTOMER', purged = 1
                WHERE customer_id = ?""",
             (customer_id,),
         )
         self.db.commit()
-        log.info(f"Customer data purged: {customer_id}")
+        log.info(f"Customer data deleted by request: {customer_id}")
 
-    def purge_profile_after_checkout(self, customer_id: str, retailer: str):
-        """Purge a specific retailer profile after successful checkout."""
+    def delete_single_profile(self, customer_id: str, retailer: str):
+        """Customer-requested deletion of a specific retailer profile."""
         self.db.execute(
             """UPDATE customer_profiles
-               SET encrypted_data = 'PURGED', purged = 1, used = 1
+               SET encrypted_data = 'DELETED_BY_CUSTOMER', purged = 1
                WHERE customer_id = ? AND retailer = ?""",
             (customer_id, retailer),
         )
         self.db.commit()
-        log.info(f"Profile purged after checkout: {customer_id} ({retailer})")
+        log.info(f"Profile deleted by customer request: {customer_id} ({retailer})")
 
     # --- Order / PAS Tracking ---
 

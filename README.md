@@ -2,7 +2,7 @@
 
 Automated Checkout (ACO) service for Pokemon TCG products. Monitors for restocks via web scraping and Discord alerts, then auto-checkouts on behalf of customers at maximum speed across all major retailers.
 
-Operates on a **PAS (Pay After Success)** model -- customers only pay fees after a successful checkout. All customer data is encrypted at rest and automatically deleted after fulfillment.
+Operates on a **PAS (Pay After Success)** model -- customers only pay fees after a successful checkout. All customer data is encrypted at rest. Customers control their own data and can choose to keep it on file for future checkouts or delete it at any time.
 
 ## Supported Retailers
 
@@ -27,9 +27,10 @@ Operates on a **PAS (Pay After Success)** model -- customers only pay fees after
 - **Address jigging** - Generate profile variants to bypass purchase limits
 - **CAPTCHA solving** - 2Captcha / CapMonster integration for reCAPTCHA and hCaptcha
 - **Proxy rotation** - Round-robin, random, or sticky proxy strategies with health checks
-- **Data security** - Fernet encryption at rest, automatic purge after checkout
+- **Data security** - Fernet encryption at rest, customer-controlled data retention/deletion
+- **Card disclaimer** - Clear disclosure that cards are charged by retailers, not by us
 - **Discord notifications** - Rich embeds for stock alerts, checkout results, errors
-- **Streamlit dashboard** - Full operator UI with customer mgmt, orders, billing, live logs
+- **Streamlit dashboard** - Customer-facing UI (orders, profiles, data management) + admin panel
 - **Dry run mode** - Test the full flow without placing real orders
 
 ## PAS Fee Schedule
@@ -143,7 +144,7 @@ pokemon-scalping-bot/
 4. **Auto-checkout** - On restock, bot launches Selenium with stealth fingerprint, checks out using customer's profile
 5. **PAS notification** - Customer notified of success via Discord webhook, 24h to acknowledge
 6. **Payment** - Customer pays PAS fee via Stripe within 72h
-7. **Data purge** - Customer's sensitive data automatically deleted after fulfillment
+7. **Data choice** - Customer keeps data on file for future drops, or deletes it anytime via dashboard
 
 ## CLI Commands
 
@@ -161,15 +162,14 @@ python bot.py --log-level DEBUG                  # Verbose logging
 
 ## Dashboard Pages
 
-| Page | Description |
-|---|---|
-| Dashboard | Service overview with KPIs, recent orders, monitored products |
-| Customers | Customer list with status, tier, checkout count, fees |
-| Orders | Full order history with status and fee tracking |
-| Add Customer | Registration form with encrypted profile storage |
-| PAS Billing | Fee schedule, overdue payments, revenue summary |
-| Monitor Log | Live bot log with filtering |
-| Settings | Service configuration viewer and quick actions |
+| Page | Who | Description |
+|---|---|---|
+| Home | Customer | Welcome page, how it works, PAS fees, card disclaimer |
+| My Orders | Customer | View checkout history, fees paid/owed |
+| My Profile | Customer | View stored retailer profiles |
+| My Data | Customer | Data retention preference, delete specific or all profiles |
+| Register | Customer | Create account, add checkout profile, agree to disclaimer |
+| Admin | Operator | Service KPIs, customer list, overdue payments, live logs |
 
 ## Dependencies
 

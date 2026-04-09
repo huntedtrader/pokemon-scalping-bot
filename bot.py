@@ -202,7 +202,7 @@ def run_add_customer():
 
     # Collect checkout profiles
     print("\n--- Checkout Profile ---")
-    print("Enter the customer's checkout details (encrypted at rest, deleted after use).\n")
+    print("Enter the customer's checkout details (encrypted at rest).\n")
 
     retailers = ["pokemon_center", "target", "walmart", "amazon", "bestbuy", "tcgplayer", "ebay"]
     print("Available retailers:", ", ".join(retailers))
@@ -218,7 +218,9 @@ def run_add_customer():
     state = input("State (2-letter): ").strip().upper()
     zipcode = input("ZIP Code: ").strip()
 
-    print("\nPayment Info (encrypted at rest, deleted after checkout):")
+    from core.customer import CARD_DISCLAIMER
+    print(f"\n{CARD_DISCLAIMER}\n")
+    print("Payment Info (encrypted at rest):")
     card = input("Card Number: ").strip()
     exp_m = input("Exp Month (MM): ").strip()
     exp_y = input("Exp Year (YYYY): ").strip()
@@ -235,7 +237,8 @@ def run_add_customer():
 
     profile_id = cm.store_profile(customer.customer_id, retailer, profile_data)
     print(f"\nProfile stored (encrypted): {profile_id}")
-    print(f"All sensitive data will be automatically deleted after checkout.")
+    print(f"Data is kept on file for future checkouts. Customer can request")
+    print(f"deletion at any time through the dashboard.")
     print(f"\nCustomer {discord_name} is ready for {retailer.upper()} checkouts!")
 
 
