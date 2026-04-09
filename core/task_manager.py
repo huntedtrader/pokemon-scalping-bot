@@ -10,7 +10,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from core.checkout import BaseCheckout, CheckoutResult, CheckoutStatus
-from core.imap_monitor import ImapMonitor
+from core.customer import CustomerManager
 from core.monitor import ProductAlert
 from core.notifier import Notifier
 from core.profile import ProfileManager, CheckoutProfile
@@ -60,13 +60,13 @@ class TaskManager:
         profile_manager: ProfileManager,
         proxy_manager: ProxyManager,
         notifier: Notifier,
-        imap_monitor: ImapMonitor,
+        customer_manager: CustomerManager = None,
     ):
         self.config = config
         self.profiles = profile_manager
         self.proxies = proxy_manager
         self.notifier = notifier
-        self.imap = imap_monitor
+        self.customers = customer_manager
         self.dry_run = config.get("general", {}).get("dry_run", True)
         self.max_concurrent = config.get("general", {}).get("max_concurrent_tasks", 5)
         self.stats = TaskStats()

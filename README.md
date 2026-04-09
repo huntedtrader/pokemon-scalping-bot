@@ -1,6 +1,8 @@
 # Pokemon Scalping Bot
 
-Automated checkout bot for Pokemon TCG products across all major retailers. Monitors for restocks via web scraping and Discord alerts, then auto-checkouts at maximum speed.
+Automated Checkout (ACO) service for Pokemon TCG products. Monitors for restocks via web scraping and Discord alerts, then auto-checkouts on behalf of customers at maximum speed across all major retailers.
+
+Operates on a **PAS (Pay After Success)** model -- customers only pay fees after a successful checkout. All customer data is encrypted at rest and automatically deleted after fulfillment.
 
 ## Supported Retailers
 
@@ -16,19 +18,34 @@ Automated checkout bot for Pokemon TCG products across all major retailers. Moni
 
 ## Features
 
+- **Customer management** - Register customers, store encrypted profiles, track orders and PAS fees
+- **PAS billing** - Pay After Success fee model with Stripe integration and auto-suspension for non-payment
 - **Async monitoring** - Poll product pages every 3s with near-zero delay via aiohttp
 - **Discord integration** - Listen to restock Discord channels for instant alerts
-- **Auto-checkout** - Full automated checkout flow with Selenium
+- **Auto-checkout** - Full automated checkout flow with Selenium on behalf of customers
 - **Anti-detection** - Undetected ChromeDriver + randomized browser fingerprints
 - **Address jigging** - Generate profile variants to bypass purchase limits
 - **CAPTCHA solving** - 2Captcha / CapMonster integration for reCAPTCHA and hCaptcha
 - **Proxy rotation** - Round-robin, random, or sticky proxy strategies with health checks
-- **IMAP monitoring** - Extract OTP codes from verification emails automatically
-- **Encrypted profiles** - Payment data encrypted at rest with Fernet
+- **Data security** - Fernet encryption at rest, automatic purge after checkout
 - **Discord notifications** - Rich embeds for stock alerts, checkout results, errors
-- **SMS alerts** - Optional Twilio SMS for critical notifications
-- **Streamlit dashboard** - Real-time monitoring UI with stats and logs
+- **Streamlit dashboard** - Full operator UI with customer mgmt, orders, billing, live logs
 - **Dry run mode** - Test the full flow without placing real orders
+
+## PAS Fee Schedule
+
+| Product Type | Fee Range |
+|---|---|
+| Tech Sticker / Blister | $1.50 - $3.00 |
+| Booster Bundle | $2.00 - $7.00 |
+| Tin | $2.00 - $5.00 |
+| ETB (Elite Trainer Box) | $5.00 - $15.00 |
+| Collection Box | $5.00 - $20.00 |
+| Booster Box | $10.00 - $25.00 |
+| PC ETB (Pokemon Center Exclusive) | $15.00 - $40.00 |
+| UPC (Ultra Premium Collection) | $20.00 - $50.00 |
+
+Bulk customers (5+ profiles) receive a 20% discount.
 
 ## Quick Start
 
@@ -42,15 +59,18 @@ pip install -r requirements.txt
 
 # Copy and configure
 cp config/config.yaml.example config/config.yaml
-# Edit config/config.yaml with your profiles, products, and API keys
+# Edit config/config.yaml with your products and API keys
 
-# Set up profile (interactive)
-python bot.py --setup
+# Register a customer (interactive)
+python bot.py --add-customer
+
+# List customers
+python bot.py --list-customers
 
 # Test with dry run
 python bot.py --dry-run
 
-# Run the bot
+# Run the ACO service
 python bot.py
 
 # Monitor only (no checkout)
@@ -70,13 +90,6 @@ general:
   monitor_interval: 3.0      # Seconds between stock checks
   max_concurrent_tasks: 5    # Parallel checkout attempts
 
-profiles:
-  - name: "My Profile"
-    first_name: "John"
-    last_name: "Doe"
-    email: "john@gmail.com"
-    # ... shipping, billing, payment details
-
 products:
   - url: "https://www.pokemoncenter.com/product/..."
     retailer: "pokemon_center"
@@ -94,16 +107,16 @@ discord:
 ```
 pokemon-scalping-bot/
 ├── bot.py              # CLI entry point
-├── dashboard.py        # Streamlit dashboard
+├── dashboard.py        # Streamlit operator dashboard (7 pages)
 ├── config/
-│   └── config.yaml     # Configuration
+│   └── config.yaml     # Service configuration
 ├── core/
+│   ├── customer.py     # Customer management + PAS billing
 │   ├── monitor.py      # Stock monitoring (scraper + Discord)
 │   ├── checkout.py     # Base checkout class
 │   ├── task_manager.py # Checkout orchestrator
-│   ├── profile.py      # Profile management + encryption
+│   ├── profile.py      # Profile encryption
 │   ├── proxy_manager.py# Proxy pool + rotation
-│   ├── imap_monitor.py # Email OTP extraction
 │   └── notifier.py     # Discord + SMS notifications
 ├── retailers/
 │   ├── pokemon_center.py
@@ -113,25 +126,50 @@ pokemon-scalping-bot/
 │   ├── bestbuy.py
 │   ├── tcgplayer.py
 │   └── ebay.py
-└── utils/
-    ├── jig.py          # Address/name jigging
-    ├── fingerprint.py  # Browser fingerprint randomization
-    ├── captcha.py      # CAPTCHA solver integration
-    └── logger.py       # Colored logging
+├── utils/
+│   ├── jig.py          # Address/name jigging
+│   ├── fingerprint.py  # Browser fingerprint randomization
+│   ├── captcha.py      # CAPTCHA solver integration
+│   └── logger.py       # Colored logging
+└── data/
+    └── customers.db    # SQLite (customers, profiles, orders)
 ```
+
+## How It Works
+
+1. **Customer onboarding** - Customer provides checkout info (card, address, login) via CLI or dashboard
+2. **Data encrypted** - All sensitive data encrypted with Fernet at rest in SQLite
+3. **Monitoring** - Bot monitors product pages + Discord channels for restocks
+4. **Auto-checkout** - On restock, bot launches Selenium with stealth fingerprint, checks out using customer's profile
+5. **PAS notification** - Customer notified of success via Discord webhook, 24h to acknowledge
+6. **Payment** - Customer pays PAS fee via Stripe within 72h
+7. **Data purge** - Customer's sensitive data automatically deleted after fulfillment
 
 ## CLI Commands
 
 ```bash
-python bot.py                                    # Full bot (monitor + checkout)
+python bot.py                                    # Full ACO service
 python bot.py --monitor-only                     # Monitor only, send alerts
 python bot.py --dry-run                          # Test without placing orders
 python bot.py --test-checkout URL RETAILER       # Test checkout flow
-python bot.py --setup                            # Interactive profile setup
+python bot.py --add-customer                     # Register new customer (interactive)
+python bot.py --list-customers                   # List all customers
 python bot.py --health-check                     # Check proxy health
 python bot.py --dashboard                        # Launch Streamlit UI
 python bot.py --log-level DEBUG                  # Verbose logging
 ```
+
+## Dashboard Pages
+
+| Page | Description |
+|---|---|
+| Dashboard | Service overview with KPIs, recent orders, monitored products |
+| Customers | Customer list with status, tier, checkout count, fees |
+| Orders | Full order history with status and fee tracking |
+| Add Customer | Registration form with encrypted profile storage |
+| PAS Billing | Fee schedule, overdue payments, revenue summary |
+| Monitor Log | Live bot log with filtering |
+| Settings | Service configuration viewer and quick actions |
 
 ## Dependencies
 
