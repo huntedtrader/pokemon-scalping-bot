@@ -45,7 +45,7 @@ Operates on a **PAS (Pay After Success)** model -- customers only pay fees after
 | PC ETB (Pokemon Center Exclusive) | $15.00 - $40.00 |
 | UPC (Ultra Premium Collection) | $20.00 - $50.00 |
 
-Bulk customers (5+ profiles) receive a 20% discount.
+Bulk customers (15+ profiles) receive a 20% discount.
 
 ## Quick Start
 

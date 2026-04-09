@@ -194,7 +194,7 @@ def run_add_customer():
     discord_name = input("Customer Discord Name: ").strip()
     email = input("Customer Email: ").strip()
 
-    print("\nTier options: standard, bulk (5+ profiles), vip")
+    print("\nTier options: standard, bulk (15+ profiles), vip")
     tier = input("Tier [standard]: ").strip() or "standard"
 
     customer = cm.add_customer(discord_id, discord_name, email, tier)
